@@ -36,9 +36,12 @@ public class MainActivity extends Activity {
 	}
 	
 	EditText editText1, editText2;
-	Button button1;
+	Button button1, button2;
+	CouchDbInstance dbInstance;
 	CouchDbConnector dbConnector;
 	String ignoreId = "";
+	ReplicationCommand pushCommand, pullCommand;
+	ReplicationStatus pushStatus, pullStatus;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -57,28 +60,28 @@ public class MainActivity extends Activity {
 
 	    // start TouchDB-Ektorp adapter
 	    HttpClient httpClient = new TouchDBHttpClient(server);
-	    CouchDbInstance dbInstance = new StdCouchDbInstance(httpClient);
+	    dbInstance = new StdCouchDbInstance(httpClient);
 
 	    // create a local database
 	    dbConnector = dbInstance.createConnector("testdb", true);
 
 	    // push this database to the test replication server
-	    ReplicationCommand pushCommand = new ReplicationCommand.Builder()
+	    pushCommand = new ReplicationCommand.Builder()
         	.source("testdb")
 	        .target("http://jerryj3.cloudant.com/a_user1")
 	        .continuous(true)
 	        .build();
 
-	    ReplicationStatus pushStatus = dbInstance.replicate(pushCommand);
+	    pushStatus = dbInstance.replicate(pushCommand);
 	    
 	    // pull this database from the test replication server
-	    ReplicationCommand pullCommand = new ReplicationCommand.Builder()
+	    pullCommand = new ReplicationCommand.Builder()
         	.source("http://jerryj3.cloudant.com/a_user1")
         	.target("testdb")
 	        .continuous(true)
 	        .build();
 
-	    ReplicationStatus pullStatus = dbInstance.replicate(pullCommand);
+	    pullStatus = dbInstance.replicate(pullCommand);
 	    
 	    ChangesCommand cmd = new ChangesCommand.Builder().includeDocs(true).build();
 	    ChangeEventTask task = new ChangeEventTask(dbConnector, cmd);
@@ -88,12 +91,15 @@ public class MainActivity extends Activity {
 		editText1 = (EditText)findViewById(R.id.editText1);
 		editText2 = (EditText)findViewById(R.id.editText2);
 		button1 = (Button)findViewById(R.id.button1);
+		button2 = (Button)findViewById(R.id.button2);
 		button1.setOnTouchListener(new View.OnTouchListener() {
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
 				if(event.getActionMasked() == MotionEvent.ACTION_DOWN) {
 					return false;
 				}
+				
+//				editText1.append("STATUS: " + pushStatus.isOk() + "\n");
 				
 				ObjectMapper om = new ObjectMapper();
 				ObjectNode newDoc = om.createObjectNode();
@@ -104,6 +110,15 @@ public class MainActivity extends Activity {
 				
 				editText1.append("UP : " + id + "\n");
 				
+				return false;
+			}
+		});
+		
+		button2.setOnTouchListener(new View.OnTouchListener() {
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				dbInstance.replicate(pushCommand);
+				dbInstance.replicate(pullCommand);
 				return false;
 			}
 		});
