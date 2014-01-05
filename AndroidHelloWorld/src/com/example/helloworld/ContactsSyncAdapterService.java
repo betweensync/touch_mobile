@@ -44,6 +44,7 @@ import android.provider.ContactsContract.CommonDataKinds.Email;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.RawContacts;
+import android.provider.Settings.Secure;
 import android.util.Log;
 
 import com.couchbase.touchdb.TDServer;
@@ -51,7 +52,7 @@ import com.couchbase.touchdb.ektorp.TouchDBHttpClient;
 import com.couchbase.touchdb.router.TDURLStreamHandlerFactory;
 
 public class ContactsSyncAdapterService extends Service {
-	final static boolean DEBUG = false;
+	final static boolean DEBUG = true;
 	final static boolean TIMER = true;
 	
 	static {
@@ -68,6 +69,7 @@ public class ContactsSyncAdapterService extends Service {
 	public static CouchDbConnector dbConnector;
 	static Account account;
 	static ConcurrentLinkedQueue<JsonNode> queue = new ConcurrentLinkedQueue<JsonNode>();
+	static String deviceId;
 
 	public ContactsSyncAdapterService() {
 		super();
@@ -115,6 +117,8 @@ public class ContactsSyncAdapterService extends Service {
 		Log.i(C.ID, "INIT: Initializing " + replication);
 		
 		ContactsSyncAdapterService.account = account;
+		deviceId = Secure.getString(context.getContentResolver(), Secure.ANDROID_ID); 
+		Log.i(C.ID, "INIT: deviceId " + deviceId);
 
 		// TouchDB Connection
 		// start TouchDB
@@ -167,7 +171,7 @@ public class ContactsSyncAdapterService extends Service {
 		@Override
 		protected void handleDocumentChange(DocumentChange change) {
 			JsonNode doc = change.getDocAsNode();
-			if (doc.get("generated_by_mobile") == null || doc.get("generated_by_mobile").getBooleanValue() == false) {
+			if (doc.get("generated_by_mobile") == null || !doc.get("generated_by_mobile").getTextValue().equals(deviceId)) {
 				if(DEBUG) Log.i(C.ID, "DOWN: " + doc);
 //				queue.add(doc);
 				
@@ -400,7 +404,7 @@ public class ContactsSyncAdapterService extends Service {
 					ObjectNode aContact = it3.next();
 					
 					//	If a contact exists in only server
-					aContact.put("generated_by_mobile", true);
+					aContact.put("generated_by_mobile", deviceId);
 					Log.i(C.ID, "DEL FROM SERVER: " + aContact.toString());
 					dbConnector.update(aContact);
 					dbConnector.delete(aContact);
@@ -415,7 +419,7 @@ public class ContactsSyncAdapterService extends Service {
 				
 				//	If a contact doesn't exist in server 
 				aContact.remove("_id");
-				aContact.put("generated_by_mobile", true);
+				aContact.put("generated_by_mobile", deviceId);
 				Log.i(C.ID, "ADD TO SERVER: " + aContact.toString());
 				dbConnector.create(aContact);
 			}
