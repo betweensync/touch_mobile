@@ -8,55 +8,54 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".MainActivity" >
 
-    <Button
-        android:id="@+id/button1"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="20dp"
-        android:text="@string/generate_data" />
-
     <EditText
         android:id="@+id/editText1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/button1"
+        android:layout_above="@+id/buttonViewDB"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
-        android:layout_below="@+id/editText2"
+        android:layout_alignParentTop="true"
         android:ems="10"
         android:inputType="textMultiLine" >
 
         <requestFocus />
     </EditText>
 
-    <EditText
-        android:id="@+id/editText2"
+    <Button
+        android:id="@+id/buttonMtoS"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true"
-        android:ems="10" />
+        android:layout_above="@+id/buttonMerge"
+        android:layout_alignLeft="@+id/editText1"
+        android:layout_alignRight="@+id/buttonStoM"
+        android:text="Mobile to Server" />
 
     <Button
-        android:id="@+id/button2"
-        style="?android:attr/buttonStyleSmall"
+        android:id="@+id/buttonStoM"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/button1"
-        android:layout_alignBottom="@+id/button1"
+        android:layout_above="@+id/buttonMtoS"
+        android:layout_alignLeft="@+id/editText1"
+        android:layout_alignRight="@+id/buttonViewDB"
+        android:text="Server to Mobile" />
+
+    <Button
+        android:id="@+id/buttonMerge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/buttonMtoS"
+        android:layout_alignParentBottom="true"
+        android:layout_alignRight="@+id/buttonMtoS"
+        android:text="MERGE" />
+
+    <Button
+        android:id="@+id/buttonViewDB"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonStoM"
+        android:layout_alignParentLeft="true"
         android:layout_alignRight="@+id/editText1"
-        android:text="Button" />
-
-    <Button
-        android:id="@+id/button3"
-        style="?android:attr/buttonStyleSmall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentLeft="true"
-        android:layout_below="@+id/editText1"
-        android:text="Button" />
+        android:text="View Mobile DB" />
 
 </RelativeLayout>
