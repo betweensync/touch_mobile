@@ -1,0 +1,57 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    tools:context=".MainActivity" >
+
+    <Button
+        android:id="@+id/buttonMtoS"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonMerge"
+        android:layout_alignLeft="@+id/buttonStoM"
+        android:layout_alignRight="@+id/buttonStoM"
+        android:text="Mobile to Server" />
+
+    <Button
+        android:id="@+id/buttonStoM"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonMtoS"
+        android:layout_alignLeft="@+id/buttonViewDB"
+        android:layout_alignRight="@+id/buttonViewDB"
+        android:text="Server to Mobile" />
+
+    <Button
+        android:id="@+id/buttonMerge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/buttonMtoS"
+        android:layout_alignParentBottom="true"
+        android:layout_alignRight="@+id/buttonMtoS"
+        android:text="MERGE" />
+
+    <Button
+        android:id="@+id/buttonViewDB"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonStoM"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:text="View Mobile DB" />
+
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/buttonViewDB"
+        android:layout_alignLeft="@+id/buttonViewDB"
+        android:layout_alignParentTop="true"
+        android:layout_alignRight="@+id/buttonViewDB"
+        android:scrollbars="vertical" />
+
+</RelativeLayout>
