@@ -176,6 +176,8 @@ public class ContactsSyncAdapterService extends Service {
 				bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
 				bundle.putInt("syncMode", C.SYNC_SERVER_TO_MOBILE);
 				ContentResolver.requestSync(account, MainActivity.AUTHORITY, bundle);
+				
+				nowSync = C.SYNC_SERVER_TO_MOBILE;
 			}
 			else {
 				if(DEBUG) Log.i(C.ID, "LOCAL: " + doc);
@@ -183,6 +185,7 @@ public class ContactsSyncAdapterService extends Service {
 		}
 	}
 
+	static int nowSync = C.SYNC_INIT;
 	private static void performSync(Context context, Account account, Bundle extras, String authority,
 			ContentProviderClient provider, SyncResult syncResult) throws OperationCanceledException {
 		int syncMode = extras.getInt("syncMode");
@@ -190,8 +193,24 @@ public class ContactsSyncAdapterService extends Service {
 		init(context, account, true);
 		ContentResolver mContentResolver = context.getContentResolver();
 		Log.i(C.ID, "performSync: " + syncMode);
+		Log.i(C.ID, "nowSync: " + nowSync);
 		
-		if(syncMode == C.SYNC_INIT) {
+		if(nowSync == C.SYNC_SERVER_TO_MOBILE && syncMode == C.SYNC_MOBILE_TO_SERVER) {
+			Log.e(C.ID, "nowSync: IGNORED");
+			
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			Bundle bundle = new Bundle();
+			bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+			bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
+			bundle.putInt("syncMode", syncMode);
+			ContentResolver.requestSync(account, MainActivity.AUTHORITY, bundle);
+
 			return;
 		}
 
@@ -435,7 +454,7 @@ public class ContactsSyncAdapterService extends Service {
 
 				ArrayList<ContentProviderOperation> ops = new ArrayList<ContentProviderOperation>();
 				int rawContactInsertIndex = ops.size();
-				ops.add(ContentProviderOperation.newInsert(RawContacts.CONTENT_URI.buildUpon().appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true").build())
+				ops.add(ContentProviderOperation.newInsert(RawContacts.CONTENT_URI)
 						.withValue(RawContacts.ACCOUNT_TYPE, aContact.get("account_type").getTextValue())
 						.withValue(RawContacts.ACCOUNT_NAME, aContact.get("account_name").getTextValue())
 						.withValue(RawContacts.DIRTY, 0)
@@ -500,6 +519,8 @@ public class ContactsSyncAdapterService extends Service {
 
 			if(TIMER) Log.i(C.ID, "Time7: " + (System.currentTimeMillis() - time));
 		}
+		
+		nowSync = C.SYNC_INIT;
 	}
 
 	final static String[] fields = {"display_name", "display_name_alt", "account_name", "account_type", "phones", "emails"};
