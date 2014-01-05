@@ -51,7 +51,7 @@ import com.couchbase.touchdb.ektorp.TouchDBHttpClient;
 import com.couchbase.touchdb.router.TDURLStreamHandlerFactory;
 
 public class ContactsSyncAdapterService extends Service {
-	final static boolean DEBUG = true;
+	final static boolean DEBUG = false;
 	final static boolean TIMER = true;
 	
 	static {
@@ -176,8 +176,6 @@ public class ContactsSyncAdapterService extends Service {
 				bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
 				bundle.putInt("syncMode", C.SYNC_SERVER_TO_MOBILE);
 				ContentResolver.requestSync(account, MainActivity.AUTHORITY, bundle);
-				
-				nowSync = C.SYNC_SERVER_TO_MOBILE;
 			}
 			else {
 				if(DEBUG) Log.i(C.ID, "LOCAL: " + doc);
@@ -185,7 +183,8 @@ public class ContactsSyncAdapterService extends Service {
 		}
 	}
 
-	static int nowSync = C.SYNC_INIT;
+	static int lastSync = C.SYNC_INIT;
+	static int lastNumOfDB = 0;
 	private static void performSync(Context context, Account account, Bundle extras, String authority,
 			ContentProviderClient provider, SyncResult syncResult) throws OperationCanceledException {
 		int syncMode = extras.getInt("syncMode");
@@ -193,31 +192,12 @@ public class ContactsSyncAdapterService extends Service {
 		init(context, account, true);
 		ContentResolver mContentResolver = context.getContentResolver();
 		Log.i(C.ID, "performSync: " + syncMode);
-		Log.i(C.ID, "nowSync: " + nowSync);
+		Log.i(C.ID, "lastSync: " + lastSync);
 		
-		if(nowSync == C.SYNC_SERVER_TO_MOBILE && syncMode == C.SYNC_MOBILE_TO_SERVER) {
-			Log.e(C.ID, "nowSync: IGNORED");
-			
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-			Bundle bundle = new Bundle();
-			bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
-			bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
-			bundle.putInt("syncMode", syncMode);
-			ContentResolver.requestSync(account, MainActivity.AUTHORITY, bundle);
-
-			return;
-		}
-
 		ObjectMapper om = new ObjectMapper();
 
 		long time = System.currentTimeMillis();
-
+		
 		if(syncMode == C.SYNC_MOBILE_TO_SERVER) {
 			boolean deletedOrDirty = false;
 			
@@ -245,8 +225,8 @@ public class ContactsSyncAdapterService extends Service {
 				ContentValues values = new ContentValues();
 				values.clear();
 				values.put(RawContacts.DIRTY , 0);
-//				mContentResolver.update(ContactsContract.RawContacts.CONTENT_URI, values,
-//						ContactsContract.RawContacts._ID + "=" + rawContactId, null);
+				mContentResolver.update(ContactsContract.RawContacts.CONTENT_URI, values,
+						ContactsContract.RawContacts._ID + "=" + rawContactId, null);
 				
 				deletedOrDirty = true;
 			}
@@ -272,6 +252,24 @@ public class ContactsSyncAdapterService extends Service {
 		
 		if(TIMER) Log.i(C.ID, "Time2: " + (System.currentTimeMillis() - time));
 
+		
+		if(lastSync == C.SYNC_SERVER_TO_MOBILE && syncMode == C.SYNC_MOBILE_TO_SERVER) {
+			Log.i(C.ID, "lastNumOfDB: " + lastNumOfDB);
+			
+			if(lastNumOfDB != serverContacts.size()) {
+				Log.e(C.ID, "Waiting SYNC_SERVER_TO_MOBILE");
+				
+				//	서버에서 모바일로 Sync 중이므로 나중에 다시 실행
+				Bundle bundle = new Bundle();
+				bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+				bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
+				bundle.putInt("syncMode", C.SYNC_MOBILE_TO_SERVER);
+				ContentResolver.requestSync(account, MainActivity.AUTHORITY, bundle);
+	
+				syncMode = lastSync;
+			}
+		}
+		
 		HashMap<Integer, ObjectNode> allPhones = new HashMap<Integer, ObjectNode>();
 		Cursor phoneCursor = mContentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, null, null, null);
 		int idxId = phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.RAW_CONTACT_ID);
@@ -426,6 +424,8 @@ public class ContactsSyncAdapterService extends Service {
 		}
 		else if(syncMode == C.SYNC_SERVER_TO_MOBILE || syncMode == C.SYNC_MERGE) {
 			Log.i(C.ID, (syncMode == C.SYNC_SERVER_TO_MOBILE) ? "SYNC_SERVER_TO_MOBILE" : "SYNC_MERGE");
+			lastNumOfDB = serverContacts.size();
+			Log.i(C.ID, "NumOfDB: " + lastNumOfDB);
 
 			if(syncMode == C.SYNC_SERVER_TO_MOBILE) {
 				Iterator<ObjectNode> it2 = mobileContactsOnly.iterator();
@@ -520,7 +520,7 @@ public class ContactsSyncAdapterService extends Service {
 			if(TIMER) Log.i(C.ID, "Time7: " + (System.currentTimeMillis() - time));
 		}
 		
-		nowSync = C.SYNC_INIT;
+		lastSync = syncMode;
 	}
 
 	final static String[] fields = {"display_name", "display_name_alt", "account_name", "account_type", "phones", "emails"};
