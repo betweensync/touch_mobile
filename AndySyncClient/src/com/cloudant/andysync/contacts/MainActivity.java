@@ -1,12 +1,17 @@
 package com.cloudant.andysync.contacts;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ObjectNode;
+import org.ektorp.AttachmentInputStream;
 import org.ektorp.CouchDbConnector;
 import org.ektorp.CouchDbInstance;
 import org.ektorp.ReplicationCommand;
@@ -173,6 +178,45 @@ public class MainActivity extends Activity {
 
 		//	File Metadata µø±‚»≠
 		dbInit(getApplicationContext());
+		
+		//	Sample meta data
+		Map<String, ObjectNode> allFiles = new HashMap<String, ObjectNode>();
+		ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
+		ViewResult allDocs = dbConnector.queryView(view);
+		for(Iterator<Row> it = allDocs.iterator(); it.hasNext();) {
+			Row row = it.next();
+			allFiles.put(row.getDocAsNode().get("absolutePath").getTextValue(), (ObjectNode)row.getDocAsNode());
+		}
+		
+		File dir = new File("//mnt/sdcard/DCIM/Camera");
+		if(dir != null) {
+			File[] files = dir.listFiles();
+			for(int i = 0; i < files.length; i++) {
+				if(i < 5) {
+					File aFile = files[i];
+					if(allFiles.get(aFile.getAbsolutePath()) == null) {
+						ObjectMapper om = new ObjectMapper();
+						ObjectNode meta = om.createObjectNode();
+						meta.put("absolutePath", aFile.getAbsolutePath());
+						meta.put("name", aFile.getName());
+						meta.put("lastModified", aFile.lastModified());
+						meta.put("isDirectory", aFile.isDirectory());
+						dbConnector.create(meta);
+						Log.i(C.ID, "ID: " + meta.get("_id"));
+						try {
+							FileInputStream fin = new FileInputStream(aFile);
+							String contentType = "image/jpeg";
+							AttachmentInputStream binary = new AttachmentInputStream("binary", fin, contentType);
+							dbConnector.createAttachment(meta.get("_id").getTextValue(), meta.get("_rev").getTextValue(), binary);
+						} catch (FileNotFoundException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						Log.i(C.ID, "ID Done: " + meta.get("_id"));
+					}
+				}
+			}
+		}
 		
 		Bundle bundle = new Bundle();
 		bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
