@@ -162,14 +162,27 @@ public class MainActivity extends Activity {
 
 				textView1.setText("");
 
-				// List all documents
-				CouchDbConnector dbConnector = ContactsSyncAdapterService.init(getApplicationContext(), myAccount, false);
-				ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
-				ViewResult allRows = dbConnector.queryView(view);
-				Iterator<Row> it = allRows.iterator();
-				while(it.hasNext()) {
-					Row node = it.next();
-					textView1.append("DOC: " + node.getDocAsNode() + "\n");
+				// List all documents: contacts
+				{
+					CouchDbConnector dbConnector = ContactsSyncAdapterService.init(getApplicationContext(), myAccount, false);
+					ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
+					ViewResult allRows = dbConnector.queryView(view);
+					Iterator<Row> it = allRows.iterator();
+					while(it.hasNext()) {
+						Row node = it.next();
+						textView1.append("CONTACT: " + node.getDocAsNode() + "\n");
+					}
+				}
+				
+				// List all documents: files
+				{
+					ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
+					ViewResult allRows = MainActivity.this.dbConnector.queryView(view);
+					Iterator<Row> it = allRows.iterator();
+					while(it.hasNext()) {
+						Row node = it.next();
+						textView1.append("FILE: " + node.getDocAsNode() + "\n");
+					}
 				}
 				
 				return false;
@@ -179,44 +192,9 @@ public class MainActivity extends Activity {
 		//	File Metadata µø±‚»≠
 		dbInit(getApplicationContext());
 		
-		//	Sample meta data
-		Map<String, ObjectNode> allFiles = new HashMap<String, ObjectNode>();
-		ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
-		ViewResult allDocs = dbConnector.queryView(view);
-		for(Iterator<Row> it = allDocs.iterator(); it.hasNext();) {
-			Row row = it.next();
-			allFiles.put(row.getDocAsNode().get("absolutePath").getTextValue(), (ObjectNode)row.getDocAsNode());
-		}
-		
-		File dir = new File("//mnt/sdcard/DCIM/Camera");
-		if(dir != null) {
-			File[] files = dir.listFiles();
-			for(int i = 0; i < files.length; i++) {
-				if(i < 5) {
-					File aFile = files[i];
-					if(allFiles.get(aFile.getAbsolutePath()) == null) {
-						ObjectMapper om = new ObjectMapper();
-						ObjectNode meta = om.createObjectNode();
-						meta.put("absolutePath", aFile.getAbsolutePath());
-						meta.put("name", aFile.getName());
-						meta.put("lastModified", aFile.lastModified());
-						meta.put("isDirectory", aFile.isDirectory());
-						dbConnector.create(meta);
-						Log.i(C.ID, "ID: " + meta.get("_id"));
-						try {
-							FileInputStream fin = new FileInputStream(aFile);
-							String contentType = "image/jpeg";
-							AttachmentInputStream binary = new AttachmentInputStream("binary", fin, contentType);
-							dbConnector.createAttachment(meta.get("_id").getTextValue(), meta.get("_rev").getTextValue(), binary);
-						} catch (FileNotFoundException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						Log.i(C.ID, "ID Done: " + meta.get("_id"));
-					}
-				}
-			}
-		}
+		File dir = new File("/mnt/sdcard/DCIM/Camera");
+		File[] files = dir.listFiles();
+		uploadFiles(files, SyncEvent.FILE_CREATED);
 		
 		Bundle bundle = new Bundle();
 		bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
@@ -330,20 +308,6 @@ public class MainActivity extends Activity {
 			case ENDED:
 				ConsoleLogger.log(MainActivity.this, textView1, "EDDED: " + syncManager.getScannedMap());
 				scanCompleted = true;
-				Map<String, SFile> subFiles = syncManager.getScannedMap();
-				for(Iterator<String> it = subFiles.keySet().iterator(); it.hasNext();) {
-					String key = it.next();
-					SFile sFile = subFiles.get(key);
-					ObjectMapper om = new ObjectMapper();
-					ObjectNode meta = om.createObjectNode();
-					meta.put("absolutePath", sFile.getAbsolutePath());
-					meta.put("name", sFile.getName());
-					meta.put("lastModified", sFile.getLastModified());
-					meta.put("isDirectory", sFile.isDirectory());
-					dbConnector.create(meta);
-					ConsoleLogger.log(MainActivity.this, textView1, "NewFileMap: " + meta);
-				}
-				
 				break;
 			}
 		}
@@ -357,22 +321,24 @@ public class MainActivity extends Activity {
 			// do something along with event types..
 			switch(syncEvent.getType()){
 			case SyncEvent.DIR_CREATED:
-				Map<String, SFile> subFiles = syncEvent.getSubFiles();
-				ConsoleLogger.log(MainActivity.this, textView1, "DIR_CREATED: " + subFiles.keySet().toArray(new String[0]).toString());
+				ConsoleLogger.log(MainActivity.this, textView1, "DIR_CREATED: " + syncEvent.getPath());
 				break;
 			case SyncEvent.DIR_DELETED:
-				ConsoleLogger.log(MainActivity.this, textView1, "DIR_DELETED: " + syncEvent);
+				ConsoleLogger.log(MainActivity.this, textView1, "DIR_DELETED: " + syncEvent.getPath());
 				break;
 			case SyncEvent.FILE_CREATED:
-				ConsoleLogger.log(MainActivity.this, textView1, "FILE_CREATED: " + syncEvent);
+				ConsoleLogger.log(MainActivity.this, textView1, "FILE_CREATED: " + syncEvent.getPath());
 				break;
 			case SyncEvent.FILE_DELETED:
-				ConsoleLogger.log(MainActivity.this, textView1, "FILE_DELETED: " + syncEvent);
+				ConsoleLogger.log(MainActivity.this, textView1, "FILE_DELETED: " + syncEvent.getPath());
 				break;
 			case SyncEvent.FILE_MODIFIED:
-				ConsoleLogger.log(MainActivity.this, textView1, "FILE_MODIFIED: " + syncEvent);
+				ConsoleLogger.log(MainActivity.this, textView1, "FILE_MODIFIED: " + syncEvent.getPath());
 				break;
 			}
+			
+			File[] files = new File[]{ new File(syncEvent.getPath()) };
+			uploadFiles(files, syncEvent.getType());
 		}
 		
 	}
@@ -425,6 +391,73 @@ public class MainActivity extends Activity {
 		Log.i(C.ID, "ChangeEventTask started");
 	}
 
+	public void uploadFiles(File[] files, int event) {
+		Log.i(C.ID, "uploadFiles: " + files.length + ", " + event);
+		
+		Map<String, ObjectNode> allFiles = new HashMap<String, ObjectNode>();
+		ViewQuery view = new ViewQuery().allDocs().includeDocs(true);
+		ViewResult allDocs = dbConnector.queryView(view);
+		for(Iterator<Row> it = allDocs.iterator(); it.hasNext();) {
+			Row row = it.next();
+			allFiles.put(row.getDocAsNode().get("absolutePath").getTextValue(), (ObjectNode)row.getDocAsNode());
+		}
+		
+		for(int i = 0; i < files.length; i++) {
+			File aFile = files[i];
+			ObjectMapper om = new ObjectMapper();
+			ObjectNode dbMeta = allFiles.get(aFile.getAbsolutePath());
+			
+			ObjectNode meta = om.createObjectNode();
+			if(dbMeta != null) {
+				meta = dbMeta;
+			}
+			
+			meta.put("absolutePath", aFile.getAbsolutePath());
+			meta.put("name", aFile.getName());
+			meta.put("lastModified", aFile.lastModified());
+			meta.put("isDirectory", aFile.isDirectory());
+			meta.put("userid", "cloudantdemo");
+			
+			if(dbMeta == null) {
+				if(event == SyncEvent.FILE_CREATED || event == SyncEvent.DIR_CREATED) {
+					Log.i(C.ID, "CREATE FILE: " + meta);
+					dbConnector.create(meta);
+				}
+				else {
+					Log.i(C.ID, "CONFLICT: " + meta);
+				}
+			}
+			else {
+				if(event == SyncEvent.FILE_MODIFIED) {
+					Log.i(C.ID, "UPDATE FILE: " + meta);
+					dbConnector.update(meta);
+				}
+				else if(event == SyncEvent.FILE_DELETED || event == SyncEvent.DIR_DELETED) {
+					Log.i(C.ID, "DELETE FILE: " + meta);
+					dbConnector.delete(meta);
+				}
+				else {
+					Log.i(C.ID, "CONFLICT: " + meta);
+				}
+			}
+			
+			if(event != SyncEvent.DIR_DELETED && event != SyncEvent.FILE_DELETED) {
+				Log.i(C.ID, "FILE Attach: " + meta.get("_id"));
+				try {
+					FileInputStream fin = new FileInputStream(aFile);
+					String contentType = "image/jpeg";
+					AttachmentInputStream binary = new AttachmentInputStream("binary", fin, contentType);
+//					dbConnector.createAttachment(meta.get("_id").getTextValue(), meta.get("_rev").getTextValue(), binary);
+				} catch (FileNotFoundException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+			Log.i(C.ID, "FILE Done: " + meta.get("_id"));
+		}
+	}
+	
 	public class ChangeEventTask extends ChangesFeedAsyncTask {
 		public ChangeEventTask(CouchDbConnector couchDbConnector, ChangesCommand changesCommand) {
 			super(couchDbConnector, changesCommand);
